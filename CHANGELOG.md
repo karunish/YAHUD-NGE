@@ -2,34 +2,25 @@
 
 One entry per iteration. Each iteration is tagged `vX.Y.Z` and published as a GitHub release with its APK.
 
-## v0.4.0: Iteration 4, Evangelion styling and movable elements (ships with the v0.3.0 items below)
-Changed files: `HudView.kt` (rewritten), `Layout.kt` (new), `EngineWatch.kt` (new), `MainActivity.kt`, `VehicleState.kt` (`Level.GOOD`), `app/build.gradle.kts` (version 0.4.0, code 4), `CHANGELOG.md`. `ObdLink.kt`, `SampleSource.kt` and the manifest are unchanged.
+## v0.4.0: Iteration 4, NERV operations-console look
+Includes the planned v0.3.0 items (there is no separate v0.3.0 release).
+Changed files: `HudView.kt` (rewritten), `MainActivity.kt`, `SampleSource.kt`, `app/build.gradle.kts` (version), `CHANGELOG.md`. New: `Gear.kt`, `Events.kt`, `THIRD_PARTY.md`, `app/src/main/assets/fonts/` (Noto Serif Display, JetBrains Mono, Saira Extra Condensed, with their OFL licences).
 
-Styling:
-- Palette: EVA-01 purple and neon green, NERV orange, near-black violet panels. Green still means "reading is fine", orange still means caution, red still means fault. RPM has no limits, so its bar uses neutral purple with a green leading segment.
-- Speed in heavy serif numerals squeezed to 80% width (title-card look), inside slowly counter-rotating hexagon rings with corner brackets.
-- Faint hexagon field across the background, a few cells tinted orange.
-- Header: orange cut-corner HUD-01 tag, hexagon link light, scrolling orange hazard strip.
-- RPM bar: 48 slanted segments, lit purple with a green head. Same non-linear dial and true tick positions as v0.2.0.
-- Readouts: cut-corner panels with a status-coloured edge and a Japanese label (冷却水温, 油温, 負荷, 吸気圧, 電圧).
-- Warning banner: hazard stripes top and bottom, 警告 block, text shrinks to fit instead of being cut off. Fault state blinks (unless animations are off in Android).
-- Standby card when no source is linked and sample is off: HUD-01 title card with 待機中 / STANDBY.
-- Mirror mode drops all decoration: only speed and RPM draw, so nothing but data glows on the windshield.
+Trip events (formerly v0.3.0):
+- Ready to move: once the engine has run above 400 rpm for 2 s, the log says "Engine running. Ready to move."
+- Unplug reminder: when RPM stays at 0 or no data for 3 s after the engine was running, or the link drops after the engine was running (and you did not tap Unlink), an orange banner (stamp 通知, "notice") says to remove the OBD adapter, plus a log line. It stays for 2 minutes; tap the screen to dismiss. Only active on a live link, not in sample mode.
 
-Movable elements (LAYOUT button):
-- Eight elements move and resize independently: header, speed, RPM, coolant, oil, load, MAP, volts.
-- Tap an element to select it, drag to move, SMALLER / BIGGER to resize (50% to 160%), RESET (selected) or RESET ALL, DONE to leave. Saved automatically.
-- Normal view and mirror view keep separate layouts. Layout can be edited in mirror view too (screen shows flipped while editing).
-- An element is always kept fully inside the safe area, so it cannot be dragged off-screen.
-- The app now draws under the camera cutout and keeps all elements out of the cutout area and rounded corners.
-- The warning banner is deliberately not movable, so an alert can never be hidden.
+Gear (estimated):
+- BimmerLink reads the gear from the gearbox computer with a BMW-specific request that is not public and has not been captured, so this build does not read it. Instead `GearEstimator` learns one rpm-per-km/h ratio per gear while you drive (needs a steady ratio for 6 readings, speed over 20 km/h, and a ratio seen 20 times before it counts as a gear). Gear 1 is the highest ratio learned. Shown bottom right of the speed panel as "GEAR EST"; "-" when clutch is in, between gears or not yet learned. Learned ratios are saved on the phone, so it only has to learn once. Sample mode uses its own separate estimator.
+- Tested on synthetic data only (it learned all 6 pretend gears); not yet tried on the car.
 
-## v0.3.0: Trip tuning (was missing from the iteration-2 upload; included in v0.4.0)
-- Added: "Engine running. Ready to move." log line, shown in green, the moment RPM is at or above 400 on two readings in a row. Fires once per start-up, not after every start-stop restart.
-- Added: unplug reminder. When the car stops answering entirely (no RPM and no speed) for 5 s after the engine had been running, a cyan banner says to remove the OBD adapter. Tap to dismiss; it also clears by itself if the engine restarts or you relink. If the link drops after the engine was running (and you did not tap Unlink), the banner says the link was lost and to remove the adapter if the car is off.
-- Start-stop is not treated as "car off": the engine computer still answers with 0 rpm during a stop.
-- RPM rescale for 1.5-3k cruising: already done in v0.2.0 (1,000-3,500 rpm gets 70% of the dial).
-- Coolant and oil limits: NOT added. The 103 C warning from the web prototype does not exist in the app (temperatures have no limits since v0.2.0). BMW service documents found describe the engine computer's coolant targets on other BMW engines (N-series) as roughly 104-112 C depending on driving mode; no B38-specific limit was found. Limits stay off until a B38 source is found.
+- Design tokens, type pairing and patterns follow TheGreatGildo/nerv-ui (MIT): black void, orange for labels, green only for a live link, cyan for MAP, red only for faults, panels with orange title bars and Japanese sub-labels, segmented bars, hazard-stripe alert banners, CRT scanlines, vignette, slow scan line and faint flicker (phone view only; off in mirror mode and when animations are turned off).
+- Layout like the reference photo: left SYSTEM STATUS panel, a bracketed centre panel with a huge compressed-serif speed numeral, right column with emblem, ENGINE LOAD and EVENT LOG, and a full-width RPM block at the bottom (same non-linear dial and ticks as before).
+- Boot sequence: panels cut in one after another with a short flicker.
+- Fault state: secondary panels drop away, the centre panel widens and the numeral turns red; the stamp reads 非常事態. Caution keeps the layout and shows 警告. 出撃待命 ("sortie standby") shows while no data source is linked.
+- Mirror mode: black void with only the centre panel, RPM block and alerts; no effects.
+- Safe-area handling: content stays clear of the camera cut-out on either side (this addresses elements being cut off; user-movable elements are still planned).
+- Emblem slot: add your own `res/drawable/emblem` image and it replaces the placeholder hexagon. No NERV logo is included. If you own MatissePro-EB.otf, drop it in `assets/fonts/` and it is used for numerals and titles.
 
 ## v0.2.0: Iteration 2, OBD link (live data from the car)
 Changed files: `ObdLink.kt` (new), `VehicleState.kt`, `SampleSource.kt`, `MainActivity.kt`, `HudView.kt`, `AndroidManifest.xml`, `app/build.gradle.kts` (version), `CHANGELOG.md`.

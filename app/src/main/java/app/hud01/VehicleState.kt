@@ -2,7 +2,7 @@ package app.hud01
 
 import java.util.Locale
 
-enum class Level { NOMINAL, GOOD, CAUTION, FAULT }
+enum class Level { NOMINAL, CAUTION, FAULT }
 
 data class Alert(val level: Level, val text: String)
 

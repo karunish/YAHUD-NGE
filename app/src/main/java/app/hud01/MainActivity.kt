@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -17,19 +16,6 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private var t = 0f
     private var obd: ObdLink? = null
-    private var userStop = false
-    private val noticeText = "ENGINE OFF. REMOVE THE OBD ADAPTER FROM THE CAR."
-
-    private val watch = EngineWatch(
-        onStarted = {
-            hud.notice = null
-            hud.log("Engine running. Ready to move.", Level.GOOD)
-        },
-        onStopped = {
-            hud.notice = noticeText
-            hud.log("Engine off. Remove the OBD adapter from the car.", Level.CAUTION)
-        },
-    )
 
     private val tick = object : Runnable {
         override fun run() {
@@ -45,12 +31,9 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Draw under the camera cutout; HudView keeps every element out of the cutout area itself.
-        val lp = window.attributes
-        lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-        window.attributes = lp
         hud = HudView(this)
         hud.onLink = { toggleLink() }
+        hud.gearLive.restore(getSharedPreferences("hud", MODE_PRIVATE).getString("gear", "") ?: "")
         setContentView(hud)
     }
 
@@ -61,6 +44,7 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        getSharedPreferences("hud", MODE_PRIVATE).edit().putString("gear", hud.gearLive.serialize()).apply()
         handler.removeCallbacks(tick)
         super.onPause()
     }
@@ -85,7 +69,7 @@ class MainActivity : Activity() {
     private fun toggleLink() {
         val running = obd
         if (running != null) {
-            userStop = true
+            hud.userUnlink = true
             running.stop()
             return
         }
@@ -107,9 +91,6 @@ class MainActivity : Activity() {
             hud.log("No paired NexLink found. Pair it in Android settings, PIN 1234.", Level.CAUTION)
             return
         }
-        userStop = false
-        watch.reset()
-        hud.notice = null
         hud.sample = false
         hud.state = VehicleState()
         hud.link = LinkState.CONNECTING
@@ -121,7 +102,6 @@ class MainActivity : Activity() {
 
             override fun onState(s: VehicleState) {
                 hud.state = s
-                watch.update(SystemClock.uptimeMillis(), s)
                 hud.invalidate()
             }
 
@@ -130,13 +110,6 @@ class MainActivity : Activity() {
             }
 
             override fun onClosed() {
-                // The link dropped while the engine was running and the driver did not unlink: the car
-                // most likely switched the adapter off with the ignition.
-                if (watch.running && !userStop) {
-                    hud.notice = "LINK LOST. IF THE CAR IS OFF, REMOVE THE OBD ADAPTER."
-                    hud.log("Link lost after the engine was running. If the car is off, remove the OBD adapter.", Level.CAUTION)
-                }
-                watch.reset()
                 obd = null
                 hud.link = LinkState.NONE
                 hud.state = VehicleState()
