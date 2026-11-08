@@ -11,8 +11,8 @@ android {
         applicationId = "app.hud01"
         minSdk = 30
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 4
+        versionName = "0.4.0"
     }
 
     // Fixed debug key committed to the repo so every CI build is signed the same

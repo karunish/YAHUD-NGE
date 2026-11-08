@@ -2,6 +2,35 @@
 
 One entry per iteration. Each iteration is tagged `vX.Y.Z` and published as a GitHub release with its APK.
 
+## v0.4.0: Iteration 4, Evangelion styling and movable elements (ships with the v0.3.0 items below)
+Changed files: `HudView.kt` (rewritten), `Layout.kt` (new), `EngineWatch.kt` (new), `MainActivity.kt`, `VehicleState.kt` (`Level.GOOD`), `app/build.gradle.kts` (version 0.4.0, code 4), `CHANGELOG.md`. `ObdLink.kt`, `SampleSource.kt` and the manifest are unchanged.
+
+Styling:
+- Palette: EVA-01 purple and neon green, NERV orange, near-black violet panels. Green still means "reading is fine", orange still means caution, red still means fault. RPM has no limits, so its bar uses neutral purple with a green leading segment.
+- Speed in heavy serif numerals squeezed to 80% width (title-card look), inside slowly counter-rotating hexagon rings with corner brackets.
+- Faint hexagon field across the background, a few cells tinted orange.
+- Header: orange cut-corner HUD-01 tag, hexagon link light, scrolling orange hazard strip.
+- RPM bar: 48 slanted segments, lit purple with a green head. Same non-linear dial and true tick positions as v0.2.0.
+- Readouts: cut-corner panels with a status-coloured edge and a Japanese label (冷却水温, 油温, 負荷, 吸気圧, 電圧).
+- Warning banner: hazard stripes top and bottom, 警告 block, text shrinks to fit instead of being cut off. Fault state blinks (unless animations are off in Android).
+- Standby card when no source is linked and sample is off: HUD-01 title card with 待機中 / STANDBY.
+- Mirror mode drops all decoration: only speed and RPM draw, so nothing but data glows on the windshield.
+
+Movable elements (LAYOUT button):
+- Eight elements move and resize independently: header, speed, RPM, coolant, oil, load, MAP, volts.
+- Tap an element to select it, drag to move, SMALLER / BIGGER to resize (50% to 160%), RESET (selected) or RESET ALL, DONE to leave. Saved automatically.
+- Normal view and mirror view keep separate layouts. Layout can be edited in mirror view too (screen shows flipped while editing).
+- An element is always kept fully inside the safe area, so it cannot be dragged off-screen.
+- The app now draws under the camera cutout and keeps all elements out of the cutout area and rounded corners.
+- The warning banner is deliberately not movable, so an alert can never be hidden.
+
+## v0.3.0: Trip tuning (was missing from the iteration-2 upload; included in v0.4.0)
+- Added: "Engine running. Ready to move." log line, shown in green, the moment RPM is at or above 400 on two readings in a row. Fires once per start-up, not after every start-stop restart.
+- Added: unplug reminder. When the car stops answering entirely (no RPM and no speed) for 5 s after the engine had been running, a cyan banner says to remove the OBD adapter. Tap to dismiss; it also clears by itself if the engine restarts or you relink. If the link drops after the engine was running (and you did not tap Unlink), the banner says the link was lost and to remove the adapter if the car is off.
+- Start-stop is not treated as "car off": the engine computer still answers with 0 rpm during a stop.
+- RPM rescale for 1.5-3k cruising: already done in v0.2.0 (1,000-3,500 rpm gets 70% of the dial).
+- Coolant and oil limits: NOT added. The 103 C warning from the web prototype does not exist in the app (temperatures have no limits since v0.2.0). BMW service documents found describe the engine computer's coolant targets on other BMW engines (N-series) as roughly 104-112 C depending on driving mode; no B38-specific limit was found. Limits stay off until a B38 source is found.
+
 ## v0.2.0: Iteration 2, OBD link (live data from the car)
 Changed files: `ObdLink.kt` (new), `VehicleState.kt`, `SampleSource.kt`, `MainActivity.kt`, `HudView.kt`, `AndroidManifest.xml`, `app/build.gradle.kts` (version), `CHANGELOG.md`.
 - Classic Bluetooth (RFCOMM) link to the paired NexLink (found by name: NEXAS, OBD or ELM). Pair it once in Android settings, PIN 1234.
