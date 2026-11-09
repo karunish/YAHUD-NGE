@@ -28,6 +28,7 @@ class ObdLink(private val device: BluetoothDevice, private val main: Handler, pr
         P("0B", "map") { a, _ -> a.toFloat() },
         P("42", "vlt") { a, b -> (a * 256 + b) / 1000f },
         P("5C", "oil") { a, _ -> a - 40f },
+        P("2F", "fuel") { a, _ -> a * 100f / 255f },
     )
 
     @Volatile private var run = false
@@ -38,7 +39,7 @@ class ObdLink(private val device: BluetoothDevice, private val main: Handler, pr
     private val nulls = HashMap<String, Int>()
     private val names = mapOf(
         "rpm" to "Engine speed", "spd" to "Vehicle speed", "clt" to "Coolant temperature",
-        "load" to "Engine load", "map" to "Manifold pressure", "vlt" to "Module voltage", "oil" to "Oil temperature",
+        "load" to "Engine load", "map" to "Manifold pressure", "vlt" to "Module voltage", "oil" to "Oil temperature", "fuel" to "Fuel level",
     )
     private val label = device.name ?: "adapter"
 
@@ -163,7 +164,7 @@ class ObdLink(private val device: BluetoothDevice, private val main: Handler, pr
 
     private fun loop() {
         val fast = listOf(0, 1)
-        val slowAll = listOf(2, 3, 4, 5, 6)
+        val slowAll = listOf(2, 3, 4, 5, 6, 7)
         var k = 0
         var bad = 0
         while (run) {
@@ -197,7 +198,7 @@ class ObdLink(private val device: BluetoothDevice, private val main: Handler, pr
                 }
             }
             val s = VehicleState(
-                vals["spd"], vals["rpm"], vals["clt"], vals["oil"], vals["load"], vals["map"], vals["vlt"],
+                vals["spd"], vals["rpm"], vals["clt"], vals["oil"], vals["load"], vals["map"], vals["vlt"], vals["fuel"],
                 unsupported.toSet(),
             )
             main.post { ui.onState(s) }

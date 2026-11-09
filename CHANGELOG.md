@@ -2,6 +2,22 @@
 
 One entry per iteration. Each iteration is tagged `vX.Y.Z` and published as a GitHub release with its APK.
 
+## v0.5.0: Iteration 5, mirror tiles, fuel, fixes
+Changed files: `HudView.kt`, `ObdLink.kt`, `VehicleState.kt`, `SampleSource.kt`, `Gear.kt`, `MainActivity.kt`, `app/build.gradle.kts`, `CHANGELOG.md`. New: `Tiles.kt`, `Fuel.kt`.
+Fixes and removals:
+- Removed the "NON-LINEAR DIAL x1000" text (the dial itself and its true-position ticks stay).
+- ENGINE LOAD: value and bar now sit side by side, so the number can no longer end up behind the gauge when an alert banner makes the panel shorter.
+- MAP ABS value is white like the other readings.
+- Removed the CRT effects (scanlines, vignette, scan line, flicker) everywhere.
+Mirror view, redesigned:
+- Speed stays the same size but moves to the left; the freed space on the right holds tiles. Speed is always shown.
+- Tiles come in pages. Swipe left or right on the phone screen to change page; tap a tile to swap it for the next tile type that is not already on that page. Page and tile choices are saved on the phone.
+- Default pages: 1) GEAR (large) + FUEL; 2) COOLANT (large) + OIL + VOLTS; 3) LOAD (large) + MAP. Tile types now: GEAR, FUEL, COOLANT, OIL, LOAD, MAP, VOLTS. New tiles (waveform, media, navigation arrows) plug in by adding one entry in `Tiles.kt` and one case in `HudView.tileData`.
+- GEAR tile: the estimated gear (see v0.4.0) shown large, with the measured ratio in rpm per km/h.
+- FUEL tile: litres left and a learned range. Reads standard PID 21-40 range PID 2F (fuel level, percent of tank); if this car does not support it the tile shows N/A and the log says so. Litres = percent x 60 L, the published F30 318i tank size from several spec sites (not BMW service data; the gauge percentage may refer to usable volume, so treat litres as approximate). Range: the app measures litres used per distance driven (distance integrated from speed, fuel level smoothed against slosh, refuels detected) and averages each new stretch into a saved consumption figure, so the range improves trip after trip. Until the first 5 km and 0.7 L stretch has been measured the tile says "RANGE LEARNING"; no default figure is invented.
+- A fault alert still collapses the mirror view to the big speed panel plus the banner.
+- Not yet verified on the car: PID 2F support, the fuel learning and the gear estimate (all tested on synthetic data only).
+
 ## v0.4.0: Iteration 4, NERV operations-console look
 Includes the planned v0.3.0 items (there is no separate v0.3.0 release).
 Changed files: `HudView.kt` (rewritten), `MainActivity.kt`, `SampleSource.kt`, `app/build.gradle.kts` (version), `CHANGELOG.md`. New: `Gear.kt`, `Events.kt`, `THIRD_PARTY.md`, `app/src/main/assets/fonts/` (Noto Serif Display, JetBrains Mono, Saira Extra Condensed, with their OFL licences).
@@ -55,5 +71,8 @@ Added:
 Not yet: OBD/Bluetooth, voice, LLM, Waze, app icon.
 
 ## Planned
-- v0.2.0: classic Bluetooth link to the NexLink with live PIDs (replaces sample data when linked).
-- v0.3.0+: voice in/out and waveform, local LLM narrator, Waze arrows.
+- v0.6.0: trip recorder and log export (CSV or JSON with every poll: temperatures, speed, rpm, load, fuel, events) for later diagnosis by an LLM.
+- v0.7.0: media tile (song title and album art, via notification access).
+- v0.8.0 onward: voice in and out with a waveform tile, local LLM narrator and 5-minute spoken updates, automatic trip summary when the engine stops, driver profile built from past trips.
+- Also planned: tile picker with more than cycling, add/remove pages, movable and resizable tiles; tile pages in phone mode; Waze trip arrows as a tile; real gear reading and fault codes / genuine BMW warnings; tachometer redline reference once known.
+- Android Auto app that shows the normal phone (non-mirror) UI. Needs research first: Android Auto only allows certain app categories and a free-form HUD may not qualify (a navigation-style app that draws its own surface, or developer-mode sideloading, may be possible).

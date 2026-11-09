@@ -26,6 +26,7 @@ object SampleSource {
             oilC = 85f + 12f * sin(t / 40f),
             loadPct = 20f + 40f * p,
             mapKpa = 60f + 80f * p,
+            fuelPct = 62f - 0.005f * t,
             volts = if (t % 120f in 90f..105f) 11.4f else 14.1f,
         )
     }

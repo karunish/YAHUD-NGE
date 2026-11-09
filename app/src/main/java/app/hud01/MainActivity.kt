@@ -33,7 +33,10 @@ class MainActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         hud = HudView(this)
         hud.onLink = { toggleLink() }
-        hud.gearLive.restore(getSharedPreferences("hud", MODE_PRIVATE).getString("gear", "") ?: "")
+        val prefs = getSharedPreferences("hud", MODE_PRIVATE)
+        hud.gearLive.restore(prefs.getString("gear", "") ?: "")
+        hud.pages.restore(prefs.getString("pages", "") ?: "")
+        hud.fuelLive.restore(prefs.getString("fuel", "") ?: "")
         setContentView(hud)
     }
 
@@ -44,7 +47,8 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
-        getSharedPreferences("hud", MODE_PRIVATE).edit().putString("gear", hud.gearLive.serialize()).apply()
+        getSharedPreferences("hud", MODE_PRIVATE).edit().putString("gear", hud.gearLive.serialize())
+            .putString("pages", hud.pages.serialize()).putString("fuel", hud.fuelLive.serialize()).apply()
         handler.removeCallbacks(tick)
         super.onPause()
     }

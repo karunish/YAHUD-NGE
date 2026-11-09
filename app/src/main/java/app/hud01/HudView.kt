@@ -1,14 +1,10 @@
 package app.hud01
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.RadialGradient
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.SystemClock
 import android.provider.Settings
@@ -67,8 +63,10 @@ class HudView(context: Context) : View(context) {
             oilTrend.add(n, v.oilC)
             if (sample) {
                 gearSample.update(v.speedKmh, v.rpm)
+                fuelSample.update(n, v.speedKmh, v.fuelPct)
             } else if (link == LinkState.LIVE) {
                 gearLive.update(v.speedKmh, v.rpm)
+                fuelLive.update(n, v.speedKmh, v.fuelPct)
                 engineEvents(n, v.rpm)
             }
         }
@@ -104,6 +102,10 @@ class HudView(context: Context) : View(context) {
     private val eng = EngineEvents()
     private var engineWasOn = false
     private var reminderUntil = 0L
+    val fuelLive = FuelModel()
+    private val fuelSample = FuelModel()
+    val pages = TilePages()
+    private val tileRects = ArrayList<RectF>()
     private val cltTrend = Trend()
     private val oilTrend = Trend()
     private val clock = SimpleDateFormat("HH:mm:ss", Locale.US)
@@ -112,21 +114,12 @@ class HudView(context: Context) : View(context) {
     private val emblemId = context.resources.getIdentifier("emblem", "drawable", context.packageName)
     private var barUntil = 0L
     private var emergency = false
-    private var scan: Shader? = null
-    private var vig: Shader? = null
-
-    override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-        val bm = Bitmap.createBitmap(1, max(3, (3 * d).toInt()), Bitmap.Config.ARGB_8888)
-        bm.eraseColor(0)
-        bm.setPixel(0, 0, 0x30000000)
-        scan = BitmapShader(bm, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
-        vig = RadialGradient(
-            w / 2f, h / 2f, max(w, h) * 0.75f,
-            intArrayOf(0x00000000, 0x00000000, 0x99000000.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP
-        )
-    }
 
     private fun gearNow(): Int? = if (sample) gearSample.gear else gearLive.gear
+
+    private fun gearRatioNow(): Float? = if (sample) gearSample.ratio else gearLive.ratio
+
+    private fun fuelNow(): FuelModel = if (sample) fuelSample else fuelLive
 
     private fun engineEvents(now: Long, rpm: Float?) {
         val ev = eng.update(now, rpm)
@@ -290,6 +283,7 @@ class HudView(context: Context) : View(context) {
         val barH = 52 * d
         c.drawColor(K.VOID)
         hits.clear()
+        tileRects.clear()
 
         c.save()
         if (mirror) c.scale(-1f, 1f, w / 2, h / 2)
@@ -307,7 +301,9 @@ class HudView(context: Context) : View(context) {
         val mainBottom = rpmTop - 6 * d
         val gap = 8 * d
         val cw = r0 - l0 - 2 * gap
-        if (mirror || emergency) {
+        if (mirror && !emergency) {
+            mirrorTiles(c, s, l0, r0, y, mainBottom, gap)
+        } else if (mirror || emergency) {
             centerPanel(c, RectF(w * 0.16f, y, w * 0.84f, mainBottom), s)
         } else {
             val lr = RectF(l0, y, l0 + cw * 0.28f, mainBottom)
@@ -321,7 +317,6 @@ class HudView(context: Context) : View(context) {
         c.restore()
 
         if (!mirror || now < barUntil) bottomBar(c, w, h, barH)
-        if (!mirror) effects(c, w, h, now)
     }
 
     private fun header(c: Canvas, l: Float, r: Float, w: Float, y: Float, now: Long) {
@@ -371,7 +366,7 @@ class HudView(context: Context) : View(context) {
         val rows = listOf(
             tempRow("COOLANT", "\u51b7\u5374\u6c34\u6e29", s, "clt", s.coolantC, cltTrend),
             tempRow("OIL", "\u6cb9\u6e29", s, "oil", s.oilC, oilTrend),
-            Row("MAP ABS", "\u5438\u6c17\u5727", fmt(s, "map", s.mapKpa, " kPa"), if (s.mapKpa == null) K.DIM else K.CYAN),
+            Row("MAP ABS", "\u5438\u6c17\u5727", fmt(s, "map", s.mapKpa, " kPa"), if (s.mapKpa == null) K.DIM else K.STEEL),
             Row("VOLTS", "\u96fb\u5727", fmt(s, "vlt", s.volts, " V", 1), if (s.voltLevel() == Level.CAUTION) K.ORANGE else K.STEEL),
         )
         val top = r.top + 22 * d
@@ -389,7 +384,7 @@ class HudView(context: Context) : View(context) {
         }
     }
 
-    private fun centerPanel(c: Canvas, r: RectF, s: VehicleState) {
+    private fun centerPanel(c: Canvas, r: RectF, s: VehicleState, showGear: Boolean = true) {
         fill(c, r.left, r.top, r.right, r.bottom, K.PANEL)
         val col = if (emergency) K.RED else K.ORANGE
         brackets(c, r, col)
@@ -414,6 +409,7 @@ class HudView(context: Context) : View(context) {
         tx(c, str, r.centerX(), r.top + r.height() * 0.5f + size * 0.34f, size, col, f.title, Paint.Align.CENTER, sx = 0.9f)
         tx(c, "KM/H", r.centerX(), r.bottom - 12 * d, 14 * d, K.DIM, f.stamp, Paint.Align.CENTER, ls = 0.25f)
         // Gear is an estimate learned from rpm / speed (the gearbox computer is not read).
+        if (!showGear) return
         val gx = r.right - 16 * d
         tx(c, "GEAR EST", gx, r.bottom - 38 * d, 10 * d, K.DIM, f.stamp, Paint.Align.RIGHT, ls = 0.15f)
         tx(c, gearNow()?.toString() ?: "-", gx, r.bottom - 12 * d, 30 * d, col, f.title, Paint.Align.RIGHT)
@@ -426,9 +422,12 @@ class HudView(context: Context) : View(context) {
         val lg = RectF(r.left, ld.bottom + g, r.right, r.bottom)
         emblem(c, e)
         panel(c, ld, "ENGINE LOAD", "\u8ca0\u8377")
-        tx(c, fmt(s, "load", s.loadPct, "%"), ld.left + 8 * d, ld.top + 44 * d, 24 * d, if (s.loadPct == null) K.DIM else K.STEEL, f.mono)
+        val loadCol = if (s.loadPct == null) K.DIM else K.STEEL
         val lit = ((s.loadPct ?: 0f) / 100f * 20f).roundToInt().coerceIn(0, 20)
-        segBar(c, RectF(ld.left + 8 * d, ld.bottom - 18 * d, ld.right - 8 * d, ld.bottom - 8 * d), 20, lit, K.ORANGE)
+        val mid = ld.top + 18 * d + (ld.height() - 18 * d) / 2
+        // value and bar sit side by side so they can never overlap, however short the panel gets
+        tx(c, fmt(s, "load", s.loadPct, "%"), ld.left + 8 * d, mid + 7 * d, 20 * d, loadCol, f.mono)
+        segBar(c, RectF(ld.left + 70 * d, mid - 5 * d, ld.right - 8 * d, mid + 5 * d), 20, lit, K.ORANGE)
         panel(c, lg, "EVENT LOG", "\u8a18\u9332")
         val top = lg.top + 22 * d
         val lh = 12 * d
@@ -477,7 +476,6 @@ class HudView(context: Context) : View(context) {
         val rpm = s.rpm
         tx(c, "ENGINE SPEED", l, top + 18 * d, 13 * d, K.ORANGE, f.stamp, ls = 0.15f)
         tx(c, "\u56de\u8ee2\u6570", l + 8 * d + mw("ENGINE SPEED", 13 * d, f.stamp, 0.15f), top + 17 * d, 10 * d, K.DIM, f.mono)
-        tx(c, "NON-LINEAR DIAL x1000", (l + r) / 2, top + 17 * d, 9 * d, K.DIM, f.mono, Paint.Align.CENTER)
         tx(c, rpm?.roundToInt()?.toString() ?: "--", r - 48 * d, top + 30 * d, 36 * d, K.STEEL, f.stamp, Paint.Align.RIGHT)
         tx(c, "RPM", r, top + 30 * d, 14 * d, K.DIM, f.stamp, Paint.Align.RIGHT, ls = 0.15f)
         if (rpm != null && rpm > RpmScale.DIAL_MAX) {
@@ -535,32 +533,136 @@ class HudView(context: Context) : View(context) {
         }
     }
 
-    /** CRT texture, phone view only: scanlines, vignette, a slow scan line and faint phosphor flicker. */
-    private fun effects(c: Canvas, w: Float, h: Float, now: Long) {
-        p.style = Paint.Style.FILL
-        p.shader = scan
-        c.drawRect(0f, 0f, w, h, p)
-        p.shader = vig
-        c.drawRect(0f, 0f, w, h, p)
-        p.shader = null
-        if (animOn) {
-            val y = (now % 6000L) / 6000f * h
-            fill(c, 0f, y, w, y + 2 * d, 0x14FFFFFF)
-            val a = (abs(sin(now / 130.0)) * 14).toInt()
-            fill(c, 0f, 0f, w, h, a shl 24)
+    // ---- mirror tiles ------------------------------------------------------------------------
+
+    private class TileData(val value: String, val unit: String, val color: Int, val sub1: String = "", val sub2: String = "")
+
+    private fun num(s: VehicleState, key: String, v: Float?, dec: Int, unit: String, col: Int, sub1: String = "", sub2: String = ""): TileData {
+        if (v == null) {
+            val na = s.unsupported.contains(key)
+            return TileData(if (na) "N/A" else "--", "", K.DIM, if (na) "NOT SUPPORTED BY CAR" else "")
+        }
+        val text = if (dec == 0) v.roundToInt().toString() else String.format(Locale.US, "%.${dec}f", v)
+        return TileData(text, unit, col, sub1, sub2)
+    }
+
+    private fun tileData(t: TileType, s: VehicleState): TileData = when (t) {
+        TileType.GEAR -> {
+            val g = gearNow()
+            val k = gearRatioNow()
+            TileData(
+                g?.toString() ?: "-", "", if (g == null) K.DIM else K.ORANGE, "ESTIMATED FROM RPM / SPEED",
+                if (k == null) "" else "RATIO " + String.format(Locale.US, "%.1f", k) + " RPM PER KM/H"
+            )
+        }
+        TileType.FUEL -> {
+            val fm = fuelNow()
+            val l = fm.litres()
+            val km = fm.rangeKm()
+            if (l == null) {
+                num(s, "fuel", null, 0, "", K.DIM)
+            } else {
+                TileData(
+                    String.format(Locale.US, "%.1f", l), "L", K.STEEL,
+                    if (km != null) "RANGE ~${km.roundToInt()} KM" else "RANGE LEARNING",
+                    "${(fm.pct ?: 0f).roundToInt()}% OF ${Car.TANK_L.roundToInt()} L TANK"
+                )
+            }
+        }
+        TileType.COOLANT -> num(s, "clt", s.coolantC, 0, "\u00b0C", K.STEEL, trendText(cltTrend), cltTrend.max?.let { "MAX ${it.roundToInt()}\u00b0C" } ?: "")
+        TileType.OIL -> num(s, "oil", s.oilC, 0, "\u00b0C", K.STEEL, trendText(oilTrend), oilTrend.max?.let { "MAX ${it.roundToInt()}\u00b0C" } ?: "")
+        TileType.LOAD -> num(s, "load", s.loadPct, 0, "%", K.STEEL)
+        TileType.MAP -> num(s, "map", s.mapKpa, 0, "kPa", K.STEEL)
+        TileType.VOLTS -> num(s, "vlt", s.volts, 1, "V", if (s.voltLevel() == Level.CAUTION) K.ORANGE else K.STEEL)
+    }
+
+    private fun drawTile(c: Canvas, r: RectF, type: TileType, s: VehicleState) {
+        fill(c, r.left, r.top, r.right, r.bottom, K.PANEL)
+        brackets(c, r, K.ORANGE)
+        tx(c, type.label, r.left + 14 * d, r.top + 22 * d, 12 * d, K.ORANGE, f.stamp, ls = 0.15f)
+        tx(c, type.jp, r.left + 22 * d + mw(type.label, 12 * d, f.stamp, 0.15f), r.top + 21 * d, 9 * d, K.DIM, f.mono)
+        val t = tileData(type, s)
+        val lines = if (r.height() >= 100 * d) 2 else if (r.height() >= 70 * d) 1 else 0
+        val subs = listOf(t.sub1, t.sub2).filter { it.isNotEmpty() }.take(lines)
+        val top = r.top + 30 * d
+        val bot = r.bottom - 10 * d - subs.size * 12 * d
+        val ah = max(14 * d, bot - top)
+        val unitW = if (t.unit.isEmpty()) 0f else mw(t.unit, 16 * d, f.stamp, 0.1f) + 8 * d
+        var size = ah * 1.1f
+        p.typeface = f.title
+        p.textSize = size
+        p.letterSpacing = 0f
+        p.textScaleX = 0.9f
+        val tw = p.measureText(t.value)
+        val maxW = r.width() - 32 * d - unitW
+        if (tw > maxW) size *= maxW / tw
+        p.textSize = size
+        val vw = p.measureText(t.value)
+        p.textScaleX = 1f
+        val x0 = r.centerX() - (vw + unitW) / 2
+        val base = top + (ah + size * 0.7f) / 2
+        tx(c, t.value, x0, base, size, t.color, f.title, sx = 0.9f)
+        if (t.unit.isNotEmpty()) tx(c, t.unit, x0 + vw + 8 * d, base, 16 * d, K.DIM, f.stamp, ls = 0.1f)
+        var y = r.bottom - 10 * d
+        for (line in subs.reversed()) {
+            tx(c, fit(line, r.width() - 20 * d, 9 * d, f.mono), r.centerX(), y, 9 * d, K.DIM, f.mono, Paint.Align.CENTER)
+            y -= 12 * d
         }
     }
 
-    override fun onTouchEvent(e: MotionEvent): Boolean {
-        if (e.action == MotionEvent.ACTION_UP) {
-            if (SystemClock.uptimeMillis() < reminderUntil) reminderUntil = 0L
-            val hit = hits.firstOrNull { it.first.contains(e.x, e.y) }
-            when (hit?.second) {
-                0 -> onLink?.invoke()
-                1 -> toggleSample()
-                2 -> mirror = !mirror
+    /** Mirror layout: speed fixed on the left, the current page of tiles on the right. */
+    private fun mirrorTiles(c: Canvas, s: VehicleState, l: Float, r: Float, top: Float, bottom: Float, gap: Float) {
+        val sp = RectF(l, top, l + (r - l) * 0.46f, bottom)
+        centerPanel(c, sp, s, false)
+        val page = pages.pages[pages.index]
+        val area = RectF(sp.right + gap, top, r, bottom)
+        val bigW = if (page.size == 1) area.width() else area.width() * 0.58f
+        val big = RectF(area.left, area.top, area.left + bigW, area.bottom)
+        drawTile(c, big, page[0], s)
+        tileRects.add(big)
+        val n = page.size - 1
+        if (n > 0) {
+            val th = (area.height() - gap * (n - 1)) / n
+            for (i in 1..n) {
+                val y = area.top + (i - 1) * (th + gap)
+                val rc = RectF(big.right + gap, y, area.right, y + th)
+                drawTile(c, rc, page[i], s)
+                tileRects.add(rc)
             }
-            if (mirror) barUntil = SystemClock.uptimeMillis() + 4000
+        }
+        for (i in pages.pages.indices) {
+            val x = area.centerX() + (i - (pages.pages.size - 1) / 2f) * 10 * d
+            fill(c, x - 3 * d, bottom + d, x + 3 * d, bottom + 5 * d, if (i == pages.index) K.ORANGE else K.LINE)
+        }
+    }
+
+    private var downX = 0f
+    private var downY = 0f
+
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (e.action == MotionEvent.ACTION_DOWN) {
+            downX = e.x
+            downY = e.y
+        } else if (e.action == MotionEvent.ACTION_UP) {
+            val now = SystemClock.uptimeMillis()
+            if (now < reminderUntil) reminderUntil = 0L
+            val dx = e.x - downX
+            val dy = e.y - downY
+            val tiles = mirror && !emergency
+            val hit = hits.firstOrNull { it.first.contains(e.x, e.y) }
+            if (hit != null) {
+                when (hit.second) {
+                    0 -> onLink?.invoke()
+                    1 -> toggleSample()
+                    2 -> mirror = !mirror
+                }
+            } else if (tiles && abs(dx) > 70 * d && abs(dx) > 2 * abs(dy)) {
+                pages.turn(if (dx < 0f) 1 else -1) // swipe on the phone screen: left = next page
+            } else if (tiles && abs(dx) < 24 * d && abs(dy) < 24 * d) {
+                val slot = tileRects.indexOfFirst { it.contains(width - e.x, e.y) } // the canvas is mirrored
+                if (slot >= 0) pages.swap(slot)
+            }
+            if (mirror) barUntil = now + 4000
             invalidate()
         }
         return true

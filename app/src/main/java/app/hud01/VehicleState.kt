@@ -15,6 +15,7 @@ data class VehicleState(
     val loadPct: Float? = null,
     val mapKpa: Float? = null,
     val volts: Float? = null,
+    val fuelPct: Float? = null,
     /** Keys ("oil", "vlt", ...) that the car reported as unsupported. Shown as N/A. */
     val unsupported: Set<String> = emptySet(),
 )

@@ -16,10 +16,15 @@ class GearEstimator {
     var gear: Int? = null
         private set
 
+    /** The last steady rpm-per-km/h ratio, or null while it is not steady. */
+    var ratio: Float? = null
+        private set
+
     fun update(speed: Float?, rpm: Float?) {
         if (speed == null || rpm == null || speed < 20f || rpm < 900f) {
             recent.clear()
             gear = null
+            ratio = null
             return
         }
         recent.add(rpm / speed)
@@ -34,10 +39,12 @@ class GearEstimator {
             sum += x
         }
         if (hi / lo > 1.03f) {
-            gear = null // changing gear, clutch in or slipping: the ratio is not steady
+            gear = null
+            ratio = null // changing gear, clutch in or slipping: the ratio is not steady
             return
         }
         val k = sum / recent.size
+        ratio = k
         val i = nearest(k, ks.indices.toList())
         if (i >= 0) {
             ns[i] = ns[i] + 1
