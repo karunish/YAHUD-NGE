@@ -37,6 +37,8 @@ class MainActivity : Activity() {
         hud.gearLive.restore(prefs.getString("gear", "") ?: "")
         hud.pages.restore(prefs.getString("pages", "") ?: "")
         hud.fuelLive.restore(prefs.getString("fuel", "") ?: "")
+        hud.mode = Mode.values().firstOrNull { it.name == prefs.getString("mode", "") } ?: Mode.SPORT
+        hud.onMode = { saveMode() }
         setContentView(hud)
     }
 
@@ -46,9 +48,14 @@ class MainActivity : Activity() {
         handler.post(tick)
     }
 
+    private fun saveMode() {
+        getSharedPreferences("hud", MODE_PRIVATE).edit().putString("mode", hud.mode.name).apply()
+    }
+
     override fun onPause() {
         getSharedPreferences("hud", MODE_PRIVATE).edit().putString("gear", hud.gearLive.serialize())
-            .putString("pages", hud.pages.serialize()).putString("fuel", hud.fuelLive.serialize()).apply()
+            .putString("pages", hud.pages.serialize()).putString("fuel", hud.fuelLive.serialize())
+            .putString("mode", hud.mode.name).apply()
         handler.removeCallbacks(tick)
         super.onPause()
     }

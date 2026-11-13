@@ -25,6 +25,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+## Visual reference: idrive7-EVAHUD
+The v0.6.0 screens follow the look of DukeAPenguin's idrive7-EVAHUD (MIT; its drive-mode colour tokens, layouts and seven-segment, MAGI and gear-frame ideas). No code, fonts or NERV mark from that project are included here. The NERV mark and Evangelion material belong to their owners.
+
 ## Fonts (SIL Open Font License 1.1)
 Noto Serif Display, JetBrains Mono and Saira Extra Condensed, from https://github.com/google/fonts. Licence texts are in `app/src/main/assets/fonts/licenses/`.
 

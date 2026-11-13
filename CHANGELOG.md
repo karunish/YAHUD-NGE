@@ -2,6 +2,23 @@
 
 One entry per iteration. Each iteration is tagged `vX.Y.Z` and published as a GitHub release with its APK.
 
+## v0.6.0: Iteration 6, iDrive 7 EVA look
+Changed files: `HudView.kt` (drawing rewritten), `MainActivity.kt`, `app/build.gradle.kts` (version), `CHANGELOG.md`, `THIRD_PARTY.md`. Nothing else changed: the OBD link, gear and fuel learning, trends, tiles and events are untouched.
+The app now looks like the iDrive 7 EVA HUD (DukeAPenguin/idrive7-EVAHUD): same colour tokens per drive mode, bracketed gear frame, segmented bars, glowing numerals, honeycomb ground, kanji labels in a serif face.
+- New MODE button (bottom bar) cycles four screens and remembers the choice:
+  - SPORT (orange): speed and rpm left, the gear in its bracket frame, five readings right (oil, water, MAP, load, volts), honeycomb ground.
+  - COMMAND (orange): gear frame beside the readings, with the MAGI sortie-check row under both.
+  - ECO PRO (blue): the learned range in slanted seven-segment digits, learned fuel use, fuel left, clock, and the line of text.
+  - COMFORT (peach): a big clock with a slowly breathing colon, the range, the line of text.
+- Header replaced by the reference's status strip: link state, "SYSTEM STATUS" (STANDBY, CONNECTING, NOMINAL, FULL THROTTLE at 90% load or more, OVER DIAL SCALE), clock, then a 40-segment rev bar with the same non-linear dial and true-position ticks. The newest event-log line takes the place of the status text for 8 s, so messages like "No paired NexLink found" are still seen. The EVENT LOG panel is gone.
+- Mirror view keeps its tiles, pages, swipe and tap-to-swap, restyled in the current mode's colours with glow.
+- Fault alert (not yet raised by anything) now shows 非常事態 in large red type with the speed beside it; the banner and the unplug reminder keep their hazard stripes.
+- What the reference shows that this car cannot supply is left out or relabelled, never invented: no boost in PSI, torque or power (MAP in kPa and load instead); fuel use is the learned average, labelled LEARNED AVG, not an instantaneous figure; "SYNC %" became "EST" with the measured ratio.
+- MAGI plates vote 承認 once their reading has arrived and 審議中 until then (oil, water, speed plus rpm). This is a signal check, not a health verdict, because the app applies no engine limits.
+- The rev bar goes orange then yellow in SPORT and COMMAND and has no red zone, since no verified rev limit exists.
+- Optional slots: `res/drawable/emblem` (drawn beside the clock; no logo is included) and `assets/fonts/JpSerif.ttf` (kanji font; otherwise the phone's own serif is used).
+- Checked: compiles with Kotlin 2.0.21 against the Android 35 API, and every screen was rendered on a desktop stand-in of the Android canvas. Not yet built with Gradle or run on the phone, so the kanji face and the weight of the gear numeral may differ slightly there.
+
 ## v0.5.0: Iteration 5, mirror tiles, fuel, fixes
 Changed files: `HudView.kt`, `ObdLink.kt`, `VehicleState.kt`, `SampleSource.kt`, `Gear.kt`, `MainActivity.kt`, `app/build.gradle.kts`, `CHANGELOG.md`. New: `Tiles.kt`, `Fuel.kt`.
 Fixes and removals:
